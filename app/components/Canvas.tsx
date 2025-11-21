@@ -79,7 +79,7 @@ export const Canvas: React.FC = () => {
   return (
     <div 
       ref={ref}
-      className="flex-1 relative bg-gray-50 dark:bg-black overflow-hidden transition-colors"
+      className="flex-1 relative bg-gray-50 dark:bg-gray-200 overflow-hidden transition-colors"
       onClick={() => selectElement(null)}
     >
       {canvasConfig.grid.enabled && (
@@ -92,8 +92,8 @@ export const Canvas: React.FC = () => {
           // Simulate view mode width
           width: canvasConfig.viewMode === 'mobile' ? '375px' : canvasConfig.viewMode === 'tablet' ? '768px' : '100%',
           margin: '0 auto',
-          borderLeft: canvasConfig.viewMode !== 'desktop' ? '1px solid #333' : 'none',
-          borderRight: canvasConfig.viewMode !== 'desktop' ? '1px solid #333' : 'none',
+          borderLeft: canvasConfig.viewMode !== 'desktop' ? '1px solid #e5e7eb' : 'none',
+          borderRight: canvasConfig.viewMode !== 'desktop' ? '1px solid #e5e7eb' : 'none',
           transition: 'width 0.3s ease'
         }}
       >

@@ -31,13 +31,11 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element }) =
     selectedId, 
     updateElement, 
     canvasConfig, 
-    checkCollision 
   } = useBuilder();
   
   const ref = useRef<HTMLDivElement>(null);
   const isSelected = selectedId === element.id;
   const [isResizing, setIsResizing] = useState(false);
-  const [collision, setCollision] = useState(false);
 
   // Drag logic
   const [{ isDragging }, drag, preview] = useDrag({
@@ -134,20 +132,6 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element }) =
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  // Collision Check Effect
-  useEffect(() => {
-    if (isDragging) {
-      // While dragging, collision is handled by the drop target or a global monitor usually,
-      // but here we are inside the element.
-      // Actually, for "drag over other elements" feedback, we might need to check this in the Canvas or useDragLayer.
-      // But let's check static collision for now or if we are just moving it.
-      // Since react-dnd handles the "move" via the drop target (Canvas), we might not get continuous updates here unless we use useDragLayer.
-      // However, we can check collision based on current props.
-    }
-    const result = checkCollision(element.id, element.position, element.size);
-    setCollision(result.hasCollision);
-  }, [element.position, element.size, checkCollision, element.id, isDragging]);
-
   const Component = ElementComponents[element.type];
 
   // Responsive Styles
@@ -182,9 +166,7 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element }) =
         e.stopPropagation();
         selectElement(element.id);
       }}
-      className={`absolute group ${isSelected ? 'ring-2 ring-blue-500' : 'hover:ring-1 hover:ring-blue-300'} ${
-        collision ? 'ring-2 ring-red-500' : ''
-      } ${isDragging ? 'opacity-50' : 'opacity-100'}`}
+      className={`absolute group ${isSelected ? 'ring-2 ring-blue-500' : 'hover:ring-1 hover:ring-blue-300'} ${isDragging ? 'opacity-50' : 'opacity-100'}`}
       style={{
         ...getStyles(),
         position: 'absolute',

@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import { BuilderElement, ElementType, ELEMENT_DEFAULTS } from '../utils/elementDefaults';
 import { validateJSON } from '../utils/validation';
-import { checkCollision, CollisionResult } from '../utils/collision';
 
 interface CanvasConfig {
   grid: {
@@ -42,7 +41,6 @@ interface BuilderContextType extends Omit<BuilderState, 'history'> {
   exportJSON: () => string;
   importJSON: (json: string) => void;
   updateCanvasConfig: (config: Partial<CanvasConfig>) => void;
-  checkCollision: (id: string, position: { x: number; y: number }, size: { width: number | string; height: number | string }) => CollisionResult;
 }
 
 const BuilderContext = createContext<BuilderContextType | undefined>(undefined);
@@ -252,10 +250,6 @@ export const BuilderProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, []);
 
-  const checkCollisionWrapper = useCallback((id: string, position: { x: number; y: number }, size: { width: number | string; height: number | string }) => {
-    return checkCollision(id, position, size, state.elements);
-  }, [state.elements]);
-
   return (
     <BuilderContext.Provider
       value={{
@@ -277,7 +271,6 @@ export const BuilderProvider: React.FC<{ children: React.ReactNode }> = ({ child
         exportJSON,
         importJSON,
         updateCanvasConfig,
-        checkCollision: checkCollisionWrapper,
       }}
     >
       {children}
