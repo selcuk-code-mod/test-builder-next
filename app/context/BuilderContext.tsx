@@ -39,7 +39,7 @@ interface BuilderContextType extends Omit<BuilderState, 'history'> {
   canUndo: boolean;
   canRedo: boolean;
   exportJSON: () => string;
-  importJSON: (json: string) => void;
+  importJSON: (json: string, canvasWidth?: number, canvasHeight?: number) => void;
   updateCanvasConfig: (config: Partial<CanvasConfig>) => void;
 }
 
@@ -221,7 +221,10 @@ export const BuilderProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const newElement = {
         ...el,
         id: crypto.randomUUID(),
-        position: { x: el.position.x + 20, y: el.position.y + 20 },
+        position: { 
+          x: typeof el.position.x === 'number' ? el.position.x + 20 : el.position.x, 
+          y: typeof el.position.y === 'number' ? el.position.y + 20 : el.position.y 
+        },
         zIndex: state.elements.length + 1,
       };
       dispatch({ type: 'ADD_ELEMENT', payload: newElement });
@@ -239,16 +242,108 @@ export const BuilderProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return JSON.stringify({ elements: state.elements }, null, 2);
   }, [state.elements]);
 
-  const importJSON = useCallback((json: string) => {
+  const importJSON = useCallback((json: string, canvasWidth: number = 1200, canvasHeight: number = 800) => {
     const validation = validateJSON(json);
+    
     if (validation.valid && validation.data) {
-      dispatch({ type: 'SET_ELEMENTS', payload: validation.data.elements });
+      let elements = validation.data.elements;
+      
+      // Calculate max bounds of imported elements
+      let maxWidth = 0;
+      let maxHeight = 0;
+      
+      elements.forEach(element => {
+        // Only consider number values for scaling calculation
+        const elX = typeof element.position.x === 'number' ? element.position.x : 0;
+        const elY = typeof element.position.y === 'number' ? element.position.y : 0;
+        const elWidth = typeof element.size.width === 'number' ? element.size.width : 300;
+        const elHeight = typeof element.size.height === 'number' ? element.size.height : 100;
+        
+        const elementRight = elX + elWidth;
+        const elementBottom = elY + elHeight;
+        
+        maxWidth = Math.max(maxWidth, elementRight);
+        maxHeight = Math.max(maxHeight, elementBottom);
+      });
+      
+      // Calculate scale factor if content exceeds canvas (with 10% margin)
+      const scaleX = maxWidth > canvasWidth ? (canvasWidth / maxWidth) * 0.9 : 1;
+      const scaleY = maxHeight > canvasHeight ? (canvasHeight / maxHeight) * 0.9 : 1;
+      const scale = Math.min(scaleX, scaleY); // Keep aspect ratio
+      
+      // Scale elements if needed
+      if (scale < 1) {
+        elements = elements.map(element => {
+          const scaledElement = { ...element };
+          
+          // Scale position
+          if (typeof element.position.x === 'number') {
+            scaledElement.position = {
+              ...scaledElement.position,
+              x: Math.round(element.position.x * scale)
+            };
+          }
+          if (typeof element.position.y === 'number') {
+            scaledElement.position = {
+              ...scaledElement.position,
+              y: Math.round(element.position.y * scale)
+            };
+          }
+          
+          // Scale size
+          if (typeof element.size.width === 'number') {
+            scaledElement.size = {
+              ...scaledElement.size,
+              width: Math.round(element.size.width * scale)
+            };
+          }
+          if (typeof element.size.height === 'number') {
+            scaledElement.size = {
+              ...scaledElement.size,
+              height: Math.round(element.size.height * scale)
+            };
+          }
+          
+          return scaledElement;
+        });
+      }
+      
+      dispatch({ type: 'SET_ELEMENTS', payload: elements });
+      
+      // Import canvas config if available
+      if (validation.data.canvas) {
+        updateCanvasConfig(validation.data.canvas);
+      }
     } else {
       console.error('Invalid JSON:', validation.errors);
-      // Could add a toast notification here
       alert('Invalid JSON: ' + validation.errors.join(', '));
     }
-  }, []);
+  }, [updateCanvasConfig]);
+
+  // Auto-detect view mode based on window size
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      let newMode: 'mobile' | 'tablet' | 'desktop' = 'desktop';
+      
+      if (width < 768) {
+        newMode = 'mobile';
+      } else if (width < 1024) {
+        newMode = 'tablet';
+      }
+
+      // Only update if changed to avoid loops/re-renders
+      if (state.canvasConfig.viewMode !== newMode) {
+        updateCanvasConfig({ viewMode: newMode });
+      }
+    };
+
+    // Initial check
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [state.canvasConfig.viewMode, updateCanvasConfig]);
 
   return (
     <BuilderContext.Provider

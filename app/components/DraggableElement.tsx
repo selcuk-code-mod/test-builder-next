@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useDrag } from 'react-dnd';
 import { getEmptyImage } from 'react-dnd-html5-backend';
-import { BuilderElement } from '../utils/elementDefaults';
+import { BuilderElement, ELEMENT_DEFAULTS } from '../utils/elementDefaults';
 import { useBuilder } from '../context/BuilderContext';
 import { HeaderElement } from './elements/HeaderElement';
 import { FooterElement } from './elements/FooterElement';
@@ -12,35 +12,47 @@ import { TextElement } from './elements/TextElement';
 import { SliderElement } from './elements/SliderElement';
 import { ResizeHandles } from './ResizeHandles';
 import { snapToGrid } from '../utils/positioning';
-
-const ElementComponents = {
-  header: HeaderElement,
-  footer: FooterElement,
-  card: CardElement,
-  text: TextElement,
-  slider: SliderElement,
-};
+import { ElementToolbar } from './ElementToolbar';
+import { ElementSettingsModal } from './ElementSettingsModal';
 
 interface DraggableElementProps {
   element: BuilderElement;
+  layoutOverride?: {
+    x: number | string;
+    y: number | string;
+    width?: number | string;
+    height?: number | string;
+  };
 }
 
-export const DraggableElement: React.FC<DraggableElementProps> = ({ element }) => {
+export const DraggableElement: React.FC<DraggableElementProps> = ({ element, layoutOverride }) => {
   const { 
     selectElement, 
     selectedId, 
     updateElement, 
-    canvasConfig, 
+    canvasConfig,
+    removeElement,
+    bringToFront,
+    sendToBack,
+    bringForward,
+    sendBackward,
   } = useBuilder();
   
   const ref = useRef<HTMLDivElement>(null);
   const isSelected = selectedId === element.id;
   const [isResizing, setIsResizing] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Drag logic
   const [{ isDragging }, drag, preview] = useDrag({
     type: 'CANVAS_ELEMENT',
-    item: { id: element.id, type: element.type, isNew: false },
+    item: { 
+      id: element.id, 
+      type: element.type, 
+      isNew: false,
+      size: element.size,
+      responsive: element.responsive 
+    },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
@@ -64,8 +76,9 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element }) =
     const startY = e.clientY;
     const startWidth = typeof element.size.width === 'number' ? element.size.width : ref.current?.offsetWidth || 0;
     const startHeight = typeof element.size.height === 'number' ? element.size.height : ref.current?.offsetHeight || 0;
-    const startLeft = element.position.x;
-    const startTop = element.position.y;
+    // Use offsetLeft/Top for starting position if position is string (like '50%' or 'calc')
+    const startLeft = typeof element.position.x === 'number' ? element.position.x : ref.current?.offsetLeft || 0;
+    const startTop = typeof element.position.y === 'number' ? element.position.y : ref.current?.offsetTop || 0;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX;
@@ -132,22 +145,40 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element }) =
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const Component = ElementComponents[element.type];
-
   // Responsive Styles
   const getStyles = () => {
     const { viewMode } = canvasConfig;
     let width = element.size.width;
     let height = element.size.height;
-    let x = element.position.x;
-    let y = element.position.y;
+    let x: number | string = element.position.x;
+    let y: number | string = element.position.y;
 
-    if (viewMode !== 'desktop' && element.responsive?.[viewMode]) {
-      const resp = element.responsive[viewMode]!;
-      if (resp.width !== undefined) width = resp.width;
-      if (resp.height !== undefined) height = resp.height;
-      if (resp.x !== undefined) x = resp.x;
-      if (resp.y !== undefined) y = resp.y;
+    if (viewMode !== 'desktop') {
+      const resp = element.responsive?.[viewMode];
+      const defaultResp = ELEMENT_DEFAULTS[element.type].responsive?.[viewMode];
+      
+      // Width priority: responsive > default > layoutOverride > fallback (100%)
+      if (resp?.width !== undefined) width = resp.width;
+      else if (defaultResp?.width !== undefined) width = defaultResp.width;
+      else if (layoutOverride?.width !== undefined) width = layoutOverride.width;
+      else width = '100%';
+
+      // Height priority: responsive > default > layoutOverride > fallback (current size)
+      if (resp?.height !== undefined) height = resp.height;
+      else if (defaultResp?.height !== undefined) height = defaultResp.height;
+      else if (layoutOverride?.height !== undefined) height = layoutOverride.height;
+      
+      // X priority: responsive > default > layoutOverride > fallback (0)
+      if (resp?.x !== undefined) x = resp.x;
+      else if (defaultResp?.x !== undefined) x = defaultResp.x;
+      else if (layoutOverride?.x !== undefined) x = layoutOverride.x;
+      else x = 0;
+
+      // Y priority: responsive > default > layoutOverride > fallback (current pos)
+      if (resp?.y !== undefined) y = resp.y;
+      else if (defaultResp?.y !== undefined) y = defaultResp.y;
+      else if (layoutOverride?.y !== undefined) y = layoutOverride.y;
+      // If neither, we keep the desktop Y (which might be weird, but usually layoutOverride covers it)
     }
 
     return {
@@ -156,33 +187,67 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element }) =
       width,
       height,
       zIndex: element.zIndex,
+      maxWidth: '100%', // Ensure it never overflows container width
     };
   };
 
   return (
-    <div
-      ref={ref}
-      onClick={(e) => {
-        e.stopPropagation();
-        selectElement(element.id);
-      }}
-      className={`absolute group ${isSelected ? 'ring-2 ring-blue-500' : 'hover:ring-1 hover:ring-blue-300'} ${isDragging ? 'opacity-50' : 'opacity-100'}`}
-      style={{
-        ...getStyles(),
-        position: 'absolute',
-        cursor: isDragging ? 'grabbing' : 'grab',
-      }}
-    >
-      <Component element={element} />
-      
-      {isSelected && !isDragging && (
-        <ResizeHandles onResizeStart={handleResizeStart} />
-      )}
-      
-      {/* Label for debug/visual */}
-      <div className="absolute -top-6 left-0 bg-blue-500 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-        {element.type} ({Math.round(element.position.x)}, {Math.round(element.position.y)})
+    <>
+      <div
+        ref={ref}
+        onClick={(e) => {
+          e.stopPropagation();
+          selectElement(element.id);
+        }}
+        className={`absolute group ${isSelected ? 'ring-2 ring-blue-500 z-10' : 'hover:ring-1 hover:ring-blue-300'} ${isDragging ? 'opacity-50' : 'opacity-100'}`}
+        style={{
+          ...getStyles(),
+          position: 'absolute',
+          cursor: isDragging ? 'grabbing' : 'grab',
+        }}
+      >
+        {/* Toolbar */}
+        {isSelected && (
+          <>
+            <ElementToolbar 
+              elementType={element.type}
+              onEdit={() => setIsEditModalOpen(true)}
+              onDelete={() => removeElement(element.id)}
+              onBringForward={() => bringForward(element.id)}
+              onSendBackward={() => sendBackward(element.id)}
+            />
+            
+            {/* Z-Index Indicator */}
+            <div className={`absolute bg-gray-900 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded shadow-lg font-mono ${
+              element.type === 'header' ? '-bottom-8 right-40' : '-top-10 left-0'
+            }`}>
+              Z: {element.zIndex}
+            </div>
+          </>
+        )}
+
+        {/* Resizers */}
+        {isSelected && (
+          <ResizeHandles onResizeStart={handleResizeStart} />
+        )}
+        
+        {/* Element Content */}
+        <div className="w-full h-full overflow-hidden bg-white dark:bg-gray-800 shadow-sm rounded-sm">
+          {element.type === 'header' && <HeaderElement element={element} />}
+          {element.type === 'footer' && <FooterElement element={element} />}
+          {element.type === 'card' && <CardElement element={element} />}
+          {element.type === 'text' && <TextElement element={element} />}
+          {element.type === 'slider' && <SliderElement element={element} />}
+        </div>
       </div>
-    </div>
+
+      {/* Settings Modal */}
+      {isEditModalOpen && (
+        <ElementSettingsModal 
+          elementId={element.id} 
+          onClose={() => setIsEditModalOpen(false)} 
+        />
+      )}
+    </>
   );
 };

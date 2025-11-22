@@ -3,7 +3,7 @@
 import React from 'react';
 import { useBuilder } from '../context/BuilderContext';
 import { useTheme } from '../context/ThemeContext';
-import { FiSun, FiMoon, FiMonitor, FiTablet, FiSmartphone } from 'react-icons/fi';
+import { FiSun, FiMoon } from 'react-icons/fi';
 
 export const Toolbar: React.FC = () => {
   const { 
@@ -25,7 +25,13 @@ export const Toolbar: React.FC = () => {
         const reader = new FileReader();
         reader.onload = (e) => {
           const content = e.target?.result as string;
-          importJSON(content);
+          
+          // Calculate available canvas dimensions
+          // Subtracting sidebar (288px) and some padding
+          const canvasWidth = Math.max(window.innerWidth - 288 - 48, 800);
+          const canvasHeight = Math.max(window.innerHeight - 64 - 48, 600);
+          
+          importJSON(content, canvasWidth, canvasHeight);
         };
         reader.readAsText(file);
       }
@@ -46,44 +52,6 @@ export const Toolbar: React.FC = () => {
   return (
     <div className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center px-6 justify-between shadow-sm z-10">
       <div className="flex items-center gap-3">
-        {/* View Mode Selector */}
-        <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
-          <button 
-            onClick={() => updateCanvasConfig({ viewMode: 'desktop' })}
-            className={`p-2 rounded transition-all ${
-              canvasConfig.viewMode === 'desktop' 
-                ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-            title="Desktop View"
-          >
-            <FiMonitor size={18} />
-          </button>
-          <button 
-            onClick={() => updateCanvasConfig({ viewMode: 'tablet' })}
-            className={`p-2 rounded transition-all ${
-              canvasConfig.viewMode === 'tablet' 
-                ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-            title="Tablet View"
-          >
-            <FiTablet size={18} />
-          </button>
-          <button 
-            onClick={() => updateCanvasConfig({ viewMode: 'mobile' })}
-            className={`p-2 rounded transition-all ${
-              canvasConfig.viewMode === 'mobile' 
-                ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-            title="Mobile View"
-          >
-            <FiSmartphone size={18} />
-          </button>
-        </div>
-
-        <div className="h-8 w-px bg-gray-300 dark:bg-gray-700" />
 
         {/* Grid Controls */}
         <button 

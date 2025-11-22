@@ -3,13 +3,13 @@ export type ElementType = 'header' | 'footer' | 'card' | 'text' | 'slider';
 export interface BuilderElement {
   id: string;
   type: ElementType;
-  position: { x: number; y: number };
+  position: { x: number | string; y: number | string };
   size: { width: number | string; height: number | string };
   zIndex: number;
   content?: any;
   responsive?: {
-    mobile?: Partial<{ x: number; y: number; width: number | string; height: number | string }>;
-    tablet?: Partial<{ x: number; y: number; width: number | string; height: number | string }>;
+    mobile?: Partial<{ x: number | string; y: number | string; width: number | string; height: number | string }>;
+    tablet?: Partial<{ x: number | string; y: number | string; width: number | string; height: number | string }>;
   };
 }
 
@@ -33,11 +33,11 @@ export const ELEMENT_DEFAULTS: Record<ElementType, Partial<BuilderElement>> = {
     },
   },
   card: {
-    size: { width: 300, height: 350 }, // Increased height for image
+    size: { width: 300, height: 200 }, // Increased height for image
     content: { title: 'Card Title', description: 'This is a content card description.', image: '' },
     zIndex: 1,
     responsive: {
-      tablet: { width: 250, height: 300 },
+      tablet: { width: '100%', height: 'auto' },
       mobile: { width: '100%', height: 'auto' }, // Auto height for mobile
     },
   },

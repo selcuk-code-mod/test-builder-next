@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useDrag } from 'react-dnd';
-import { ElementType } from '../utils/elementDefaults';
+import { ElementType, ELEMENT_DEFAULTS } from '../utils/elementDefaults';
 
 import { FaHeading, FaParagraph, FaImage, FaLayerGroup, FaSquare } from 'react-icons/fa';
 import { MdViewDay, MdViewStream } from 'react-icons/md';
@@ -18,7 +18,11 @@ const ICON_MAP: Record<ElementType, React.ReactNode> = {
 const SidebarItem: React.FC<{ type: ElementType; label: string }> = ({ type, label }) => {
   const [{ isDragging }, drag] = useDrag({
     type: 'SIDEBAR_ITEM',
-    item: { type, isNew: true },
+    item: { 
+      type, 
+      isNew: true,
+      size: ELEMENT_DEFAULTS[type].size 
+    },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),

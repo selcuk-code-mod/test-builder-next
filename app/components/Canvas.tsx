@@ -6,6 +6,8 @@ import { useBuilder } from '../context/BuilderContext';
 import { DraggableElement } from './DraggableElement';
 import { GridOverlay } from './GridOverlay';
 import { getSnappedPosition } from '../utils/positioning';
+import { checkCollision } from '../utils/collision';
+import { ELEMENT_DEFAULTS } from '../utils/elementDefaults';
 
 export const Canvas: React.FC = () => {
   const { 
@@ -18,63 +20,211 @@ export const Canvas: React.FC = () => {
   
   const ref = useRef<HTMLDivElement>(null);
 
-  const [, drop] = useDrop({
+  const [dragState, setDragState] = React.useState<{
+    x: number;
+    y: number;
+    width: number | string;
+    height: number | string;
+    isColliding: boolean;
+  } | null>(null);
+
+  const [{ isOver }, drop] = useDrop({
     accept: ['SIDEBAR_ITEM', 'CANVAS_ELEMENT'],
-    drop: (item: any, monitor) => {
-      const delta = monitor.getDifferenceFromInitialOffset();
-      const clientOffset = monitor.getClientOffset();
-      
-      if (!clientOffset || !ref.current) return;
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+    }),
+    hover: (item: any, monitor) => {
+      const sourceClientOffset = monitor.getSourceClientOffset();
+      if (!sourceClientOffset || !ref.current) return;
 
       const canvasRect = ref.current.getBoundingClientRect();
-      
-      // Calculate position relative to canvas
-      let x = clientOffset.x - canvasRect.left;
-      let y = clientOffset.y - canvasRect.top;
+      let x = sourceClientOffset.x - canvasRect.left;
+      let y = sourceClientOffset.y - canvasRect.top;
 
-      // Adjust for scroll if needed (ref.current.scrollLeft...)
-      
-      // If moving existing element, we need to account for the initial grab offset
-      // But for simplicity in this 'drop' handler, we might just use the final position.
-      // However, 'useDrag' on the element handles the visual movement.
-      // We need to update the store.
-      
-      // Snap to grid
       const snapped = getSnappedPosition(x, y, canvasConfig.grid.size, canvasConfig.grid.snap);
+      
+      // Resolve size for collision check
+      const resolveDimension = (val: number | string | undefined, containerSize: number) => {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string' && val.endsWith('%')) {
+          return (parseFloat(val) / 100) * containerSize;
+        }
+        // Default fallback if unknown or calc
+        return typeof val === 'number' ? val : 100; 
+      };
+
+      const widthVal = item.size?.width;
+      const heightVal = item.size?.height;
+
+      const width = resolveDimension(widthVal, canvasRect.width);
+      const height = resolveDimension(heightVal, canvasRect.height);
+
+      // Check collision
+      const isColliding = checkCollision(
+        { x: snapped.x, y: snapped.y, width, height },
+        elements,
+        item.id, // Exclude self if moving
+        { width: canvasRect.width, height: canvasRect.height }
+      );
+
+      setDragState({
+        x: snapped.x,
+        y: snapped.y,
+        width,
+        height,
+        isColliding
+      });
+    },
+    drop: (item: any, monitor) => {
+      const sourceClientOffset = monitor.getSourceClientOffset();
+      if (!sourceClientOffset || !ref.current) return;
+
+      const canvasRect = ref.current.getBoundingClientRect();
+      let x = sourceClientOffset.x - canvasRect.left;
+      let y = sourceClientOffset.y - canvasRect.top;
+
+      const snapped = getSnappedPosition(x, y, canvasConfig.grid.size, canvasConfig.grid.snap);
+
+      // Final collision check
+      const resolveDimension = (val: number | string | undefined, containerSize: number) => {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string' && val.endsWith('%')) {
+          return (parseFloat(val) / 100) * containerSize;
+        }
+        return typeof val === 'number' ? val : 100;
+      };
+
+      const widthVal = item.size?.width;
+      const heightVal = item.size?.height;
+
+      const width = resolveDimension(widthVal, canvasRect.width);
+      const height = resolveDimension(heightVal, canvasRect.height);
+      
+      const isColliding = checkCollision(
+        { x: snapped.x, y: snapped.y, width, height },
+        elements,
+        item.id,
+        { width: canvasRect.width, height: canvasRect.height }
+      );
+
+      if (isColliding) {
+        // Prevent drop
+        return;
+      }
 
       if (item.isNew) {
         addElement(item.type, snapped);
       } else {
-        // For existing elements, we calculate the new position based on delta
-        // But here we are calculating absolute position from drop.
-        // Since we don't know the exact grab point offset in 'drop' easily without 'monitor.getInitialSourceClientOffset()',
-        // let's try to use the delta.
-        
-        // Actually, for existing elements, it's better to update position during 'hover' or 'drag' end.
-        // But 'drop' is fine for final commitment.
-        // Let's use the item's current position + delta? No, item doesn't have position in it unless we put it there.
-        // Let's rely on the calculation we did above which places the TOP-LEFT of the drag preview at the mouse?
-        // No, usually we want the element to stay under the cursor where we grabbed it.
-        
-        // Better approach for existing elements:
-        // The `DraggableElement` component handles its own position updates via `useDrag`? 
-        // No, `useDrag` doesn't update state automatically.
-        // We need to update state here.
-        
-        // Let's use the delta approach for existing elements to preserve grab offset.
-        const element = elements.find(e => e.id === item.id);
-        if (element && delta) {
-           let newX = element.position.x + delta.x;
-           let newY = element.position.y + delta.y;
-           
-           const snappedMove = getSnappedPosition(newX, newY, canvasConfig.grid.size, canvasConfig.grid.snap);
-           updateElement(item.id, { position: snappedMove });
-        }
+        updateElement(item.id, { position: snapped });
       }
+      
+      setDragState(null);
     },
-  });
+  }, [elements, canvasConfig]);
 
   drop(ref);
+
+  // Clear drag state when not over
+  React.useEffect(() => {
+    if (!isOver) {
+      setDragState(null);
+    }
+  }, [isOver]);
+
+  // Auto-layout calculation for responsive modes
+  const sortedElements = React.useMemo(() => {
+    if (canvasConfig.viewMode === 'desktop') {
+      return elements.map(el => ({ ...el, layoutOverride: undefined }));
+    }
+
+    // Sort elements by Y position (then X) to determine flow order
+    const sorted = [...elements].sort((a, b) => {
+      const aY = typeof a.position.y === 'number' ? a.position.y : 0;
+      const bY = typeof b.position.y === 'number' ? b.position.y : 0;
+      if (Math.abs(aY - bY) > 10) return aY - bY; // Tolerance for same row
+      
+      const aX = typeof a.position.x === 'number' ? a.position.x : 0;
+      const bX = typeof b.position.x === 'number' ? b.position.x : 0;
+      return aX - bX;
+    });
+
+    let currentY = 0;
+    let currentRowHeight = 0;
+    let col = 0;
+    const GAP = 20;
+
+    return sorted.map(el => {
+      const viewMode = canvasConfig.viewMode as 'mobile' | 'tablet';
+      // Resolve width: check instance override -> type default -> fallback
+      const instanceResp = el.responsive?.[viewMode];
+      const defaultResp = ELEMENT_DEFAULTS[el.type].responsive?.[viewMode];
+      
+      // Check if element has specific responsive positioning (manual override)
+      if (instanceResp && instanceResp.y !== undefined) {
+        // Flush current row if any
+        if (col > 0) {
+          currentY += currentRowHeight + GAP;
+          currentRowHeight = 0;
+          col = 0;
+        }
+
+        // Update currentY to be below this element if it's further down
+        const h = instanceResp.height || el.size.height;
+        const y = instanceResp.y;
+        
+        if (typeof y === 'number' && typeof h === 'number') {
+           currentY = Math.max(currentY, y + h + GAP);
+        }
+        
+        return { ...el, layoutOverride: undefined };
+      }
+
+      // Otherwise, auto-stack
+      const width = instanceResp?.width ?? defaultResp?.width ?? '100%';
+      const height = typeof instanceResp?.height === 'number' ? instanceResp.height : 
+                     (typeof defaultResp?.height === 'number' ? defaultResp.height :
+                     (typeof el.size.height === 'number' ? el.size.height : 200));
+      
+      // Check if half width (e.g. tablet cards)
+      const isHalf = typeof width === 'string' && width.includes('/ 2');
+      
+      let x: string | number = 0;
+      let y = currentY;
+
+      if (isHalf) {
+        if (col === 0) {
+          x = 0;
+          currentRowHeight = Math.max(currentRowHeight, height as number);
+          col = 1;
+        } else {
+          x = '50%';
+          currentRowHeight = Math.max(currentRowHeight, height as number);
+          col = 0;
+          currentY += currentRowHeight + GAP;
+          currentRowHeight = 0;
+        }
+      } else {
+        // Full width
+        if (col > 0) {
+          currentY += currentRowHeight + GAP;
+          currentRowHeight = 0;
+          col = 0;
+          y = currentY;
+        }
+        x = 0;
+        currentY += (height as number) + GAP;
+      }
+
+      const override = {
+        x,
+        y,
+        width,
+        height
+      };
+
+      return { ...el, layoutOverride: override };
+    });
+  }, [elements, canvasConfig.viewMode]);
 
   return (
     <div 
@@ -97,9 +247,31 @@ export const Canvas: React.FC = () => {
           transition: 'width 0.3s ease'
         }}
       >
-        {elements.map((el) => (
-          <DraggableElement key={el.id} element={el} />
+        {sortedElements.map((el) => (
+          <DraggableElement 
+            key={el.id} 
+            element={el} 
+            layoutOverride={el.layoutOverride}
+          />
         ))}
+
+        {/* Ghost Element for Drag Feedback */}
+        {isOver && dragState && (
+          <div
+            style={{
+              position: 'absolute',
+              left: dragState.x,
+              top: dragState.y,
+              width: dragState.width,
+              height: dragState.height,
+              border: `2px solid ${dragState.isColliding ? 'red' : '#3b82f6'}`,
+              backgroundColor: dragState.isColliding ? 'rgba(255, 0, 0, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+              zIndex: 100,
+              pointerEvents: 'none',
+              transition: 'all 0.1s ease'
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -3,21 +3,19 @@ import { BuilderElement, ElementType } from './elementDefaults';
 /**
  * Normalizes position data from various formats
  */
-const normalizePosition = (posData: any): { x: number; y: number } => {
-  // Format 1: { x: 100, y: 200 }
-  if (typeof posData?.x === 'number' && typeof posData?.y === 'number') {
+/**
+ * Normalizes position data from various formats
+ */
+const normalizePosition = (posData: any): { x: number | string; y: number | string } => {
+  // Format 1: { x: 100, y: 200 } or { x: "100%", y: "calc(...)" }
+  if ((typeof posData?.x === 'number' || typeof posData?.x === 'string') && 
+      (typeof posData?.y === 'number' || typeof posData?.y === 'string')) {
     return { x: posData.x, y: posData.y };
   }
   
   // Format 2: { position: { x: 100, y: 200 } }
   if (posData?.position?.x !== undefined) {
     return normalizePosition(posData.position);
-  }
-  
-  // Format 3: String calculations like "calc(100% - 80px)"
-  if (typeof posData?.y === 'string' && posData.y.includes('calc')) {
-    // For now, default to 0, could be enhanced to parse calc expressions
-    return { x: posData.x || 0, y: 0 };
   }
   
   // Default
@@ -27,7 +25,7 @@ const normalizePosition = (posData: any): { x: number; y: number } => {
 /**
  * Normalizes size data from various formats
  */
-const normalizeSize = (sizeData: any, posData: any): { width: number | string; height: number | string } => {
+const normalizeSize = (sizeData: any, posData: any, externalElement?: any): { width: number | string; height: number | string } => {
   let width: number | string = 300;
   let height: number | string = 200;
   
@@ -38,6 +36,10 @@ const normalizeSize = (sizeData: any, posData: any): { width: number | string; h
   // Check in position object (common in some formats)
   if (posData?.width !== undefined) width = posData.width;
   if (posData?.height !== undefined) height = posData.height;
+  
+  // Check directly in element object (root level)
+  if (externalElement?.width !== undefined) width = externalElement.width;
+  if (externalElement?.height !== undefined) height = externalElement.height;
   
   // Handle minHeight
   if (posData?.minHeight !== undefined && height === 'auto') {
@@ -52,6 +54,7 @@ const normalizeSize = (sizeData: any, posData: any): { width: number | string; h
  */
 const mapElementType = (externalType: string): ElementType => {
   const typeMap: Record<string, ElementType> = {
+    'header': 'header',
     'navbar': 'header',
     'nav': 'header',
     'hero': 'slider',
@@ -152,7 +155,7 @@ const convertToInternalFormat = (externalElement: any): BuilderElement | null =>
     const position = normalizePosition(externalElement);
     
     // Extract size
-    const size = normalizeSize(externalElement.size, externalElement.position);
+    const size = normalizeSize(externalElement.size, externalElement.position, externalElement);
     
     // Extract content
     const content = normalizeContent(type, externalElement.content);
@@ -187,12 +190,19 @@ const convertToInternalFormat = (externalElement: any): BuilderElement | null =>
 export const validateJSON = (json: string): { 
   valid: boolean; 
   errors: string[];
-  data?: { elements: BuilderElement[] };
+  data?: { 
+    elements: BuilderElement[];
+    canvas?: {
+      grid?: { enabled: boolean; size: number; snap: boolean };
+      viewMode?: 'desktop' | 'tablet' | 'mobile';
+    };
+  };
 } => {
   try {
     const parsed = JSON.parse(json);
     const errors: string[] = [];
     let elements: any[] = [];
+    let canvasConfig: any = undefined;
     
     // Format detection and extraction
     if (Array.isArray(parsed)) {
@@ -201,9 +211,11 @@ export const validateJSON = (json: string): {
     } else if (parsed.elements && Array.isArray(parsed.elements)) {
       // Format 2: { elements: [...] }
       elements = parsed.elements;
+      if (parsed.canvas) canvasConfig = parsed.canvas;
     } else if (parsed.project && parsed.elements) {
       // Format 3: Complex project format with metadata
       elements = parsed.elements;
+      if (parsed.canvas) canvasConfig = parsed.canvas;
     } else if (parsed.data && Array.isArray(parsed.data)) {
       // Format 4: { data: [...] }
       elements = parsed.data;
@@ -255,7 +267,10 @@ export const validateJSON = (json: string): {
     return {
       valid: errors.length === 0,
       errors,
-      data: { elements: convertedElements },
+      data: { 
+        elements: convertedElements,
+        canvas: canvasConfig
+      },
     };
     
   } catch (e) {

@@ -28,7 +28,7 @@ export const PropertyPanel: React.FC = () => {
   }
 
   const handleSizeChange = (dim: 'width' | 'height', value: string) => {
-    const num = parseInt(value);
+    const num = parseInt(value, 10);
     updateElement(selectedElement.id, {
       size: {
         ...selectedElement.size,
@@ -38,15 +38,13 @@ export const PropertyPanel: React.FC = () => {
   };
 
   const handlePositionChange = (axis: 'x' | 'y', value: string) => {
-    const num = parseInt(value);
-    if (!isNaN(num)) {
-      updateElement(selectedElement.id, {
-        position: {
-          ...selectedElement.position,
-          [axis]: num
-        }
-      });
-    }
+    const num = parseInt(value, 10);
+    updateElement(selectedElement.id, {
+      position: {
+        ...selectedElement.position,
+        [axis]: isNaN(num) ? value : num
+      }
+    });
   };
 
   const handleContentChange = (key: string, value: string) => {
@@ -126,8 +124,8 @@ export const PropertyPanel: React.FC = () => {
             <div>
               <label className="text-xs text-gray-600 dark:text-gray-400 block mb-1">X</label>
               <input 
-                type="number" 
-                value={Math.round(selectedElement.position.x)} 
+                type="text" 
+                value={selectedElement.position.x} 
                 onChange={(e) => handlePositionChange('x', e.target.value)}
                 className="w-full bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-sm text-gray-900 dark:text-white"
               />
@@ -135,8 +133,8 @@ export const PropertyPanel: React.FC = () => {
             <div>
               <label className="text-xs text-gray-600 dark:text-gray-400 block mb-1">Y</label>
               <input 
-                type="number" 
-                value={Math.round(selectedElement.position.y)} 
+                type="text" 
+                value={selectedElement.position.y} 
                 onChange={(e) => handlePositionChange('y', e.target.value)}
                 className="w-full bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-sm text-gray-900 dark:text-white"
               />
@@ -282,6 +280,7 @@ export const PropertyPanel: React.FC = () => {
           {Object.entries(selectedElement.content).map(([key, value]) => {
             if (key === 'style') return null; // Skip style object for now
             if (key === 'images') return null; // Skip images array (handled above)
+            if (key === 'image') return null; // Skip image string (handled in specific section)
             if (Array.isArray(value)) return null; // Skip other arrays
             
             return (
