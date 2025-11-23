@@ -17,6 +17,7 @@ interface BuilderState {
   elements: BuilderElement[];
   selectedId: string | null;
   canvasConfig: CanvasConfig;
+  zoom: number;
   history: {
     past: BuilderElement[][];
     future: BuilderElement[][];
@@ -41,6 +42,7 @@ interface BuilderContextType extends Omit<BuilderState, 'history'> {
   exportJSON: () => string;
   importJSON: (json: string, canvasWidth?: number, canvasHeight?: number) => void;
   updateCanvasConfig: (config: Partial<CanvasConfig>) => void;
+  setZoom: (zoom: number) => void;
 }
 
 const BuilderContext = createContext<BuilderContextType | undefined>(undefined);
@@ -52,6 +54,7 @@ const initialState: BuilderState = {
     grid: { enabled: true, size: 20, snap: true },
     viewMode: 'desktop',
   },
+  zoom: 100,
   history: {
     past: [],
     future: [],
@@ -67,6 +70,7 @@ type Action =
   | { type: 'UPDATE_CONFIG'; payload: Partial<CanvasConfig> }
   | { type: 'UNDO' }
   | { type: 'REDO' }
+  | { type: 'SET_ZOOM'; payload: number }
   | { type: 'CLEAR_CANVAS' };
 
 const builderReducer = (state: BuilderState, action: Action): BuilderState => {
@@ -122,6 +126,11 @@ const builderReducer = (state: BuilderState, action: Action): BuilderState => {
       return {
         ...state,
         canvasConfig: { ...state.canvasConfig, ...action.payload },
+      };
+    case 'SET_ZOOM':
+      return {
+        ...state,
+        zoom: action.payload,
       };
     case 'UNDO': {
       if (state.history.past.length === 0) return state;
@@ -194,6 +203,10 @@ export const BuilderProvider: React.FC<{ children: React.ReactNode }> = ({ child
     dispatch({ type: 'UPDATE_CONFIG', payload: config });
   }, []);
 
+  const setZoom = useCallback((zoom: number) => {
+    dispatch({ type: 'SET_ZOOM', payload: zoom });
+  }, []);
+
   // Z-Index Helpers
   const bringToFront = useCallback((id: string) => {
     const maxZ = Math.max(...state.elements.map((el) => el.zIndex), 0);
@@ -242,71 +255,11 @@ export const BuilderProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return JSON.stringify({ elements: state.elements }, null, 2);
   }, [state.elements]);
 
-  const importJSON = useCallback((json: string, canvasWidth: number = 1200, canvasHeight: number = 800) => {
+  const importJSON = useCallback((json: string) => {
     const validation = validateJSON(json);
     
     if (validation.valid && validation.data) {
-      let elements = validation.data.elements;
-      
-      // Calculate max bounds of imported elements
-      let maxWidth = 0;
-      let maxHeight = 0;
-      
-      elements.forEach(element => {
-        // Only consider number values for scaling calculation
-        const elX = typeof element.position.x === 'number' ? element.position.x : 0;
-        const elY = typeof element.position.y === 'number' ? element.position.y : 0;
-        const elWidth = typeof element.size.width === 'number' ? element.size.width : 300;
-        const elHeight = typeof element.size.height === 'number' ? element.size.height : 100;
-        
-        const elementRight = elX + elWidth;
-        const elementBottom = elY + elHeight;
-        
-        maxWidth = Math.max(maxWidth, elementRight);
-        maxHeight = Math.max(maxHeight, elementBottom);
-      });
-      
-      // Calculate scale factor if content exceeds canvas (with 10% margin)
-      const scaleX = maxWidth > canvasWidth ? (canvasWidth / maxWidth) * 0.9 : 1;
-      const scaleY = maxHeight > canvasHeight ? (canvasHeight / maxHeight) * 0.9 : 1;
-      const scale = Math.min(scaleX, scaleY); // Keep aspect ratio
-      
-      // Scale elements if needed
-      if (scale < 1) {
-        elements = elements.map(element => {
-          const scaledElement = { ...element };
-          
-          // Scale position
-          if (typeof element.position.x === 'number') {
-            scaledElement.position = {
-              ...scaledElement.position,
-              x: Math.round(element.position.x * scale)
-            };
-          }
-          if (typeof element.position.y === 'number') {
-            scaledElement.position = {
-              ...scaledElement.position,
-              y: Math.round(element.position.y * scale)
-            };
-          }
-          
-          // Scale size
-          if (typeof element.size.width === 'number') {
-            scaledElement.size = {
-              ...scaledElement.size,
-              width: Math.round(element.size.width * scale)
-            };
-          }
-          if (typeof element.size.height === 'number') {
-            scaledElement.size = {
-              ...scaledElement.size,
-              height: Math.round(element.size.height * scale)
-            };
-          }
-          
-          return scaledElement;
-        });
-      }
+      const elements = validation.data.elements;
       
       dispatch({ type: 'SET_ELEMENTS', payload: elements });
       
@@ -366,6 +319,7 @@ export const BuilderProvider: React.FC<{ children: React.ReactNode }> = ({ child
         exportJSON,
         importJSON,
         updateCanvasConfig,
+        setZoom,
       }}
     >
       {children}

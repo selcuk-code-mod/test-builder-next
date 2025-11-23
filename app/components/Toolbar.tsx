@@ -26,12 +26,7 @@ export const Toolbar: React.FC = () => {
         reader.onload = (e) => {
           const content = e.target?.result as string;
           
-          // Calculate available canvas dimensions
-          // Subtracting sidebar (288px) and some padding
-          const canvasWidth = Math.max(window.innerWidth - 288 - 48, 800);
-          const canvasHeight = Math.max(window.innerHeight - 64 - 48, 600);
-          
-          importJSON(content, canvasWidth, canvasHeight);
+          importJSON(content);
         };
         reader.readAsText(file);
       }
@@ -50,7 +45,7 @@ export const Toolbar: React.FC = () => {
   };
 
   return (
-    <div className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center px-6 justify-between shadow-sm z-10">
+    <div className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 hidden min-[950px]:flex items-center px-6 justify-between shadow-sm z-10">
       <div className="flex items-center gap-3">
 
         {/* Grid Controls */}

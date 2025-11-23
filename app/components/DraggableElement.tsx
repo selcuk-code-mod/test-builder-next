@@ -36,6 +36,7 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element, lay
     sendToBack,
     bringForward,
     sendBackward,
+    zoom,
   } = useBuilder();
   
   const ref = useRef<HTMLDivElement>(null);
@@ -81,8 +82,9 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element, lay
     const startTop = typeof element.position.y === 'number' ? element.position.y : ref.current?.offsetTop || 0;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaY = moveEvent.clientY - startY;
+      const scale = zoom / 100;
+      const deltaX = (moveEvent.clientX - startX) / scale;
+      const deltaY = (moveEvent.clientY - startY) / scale;
 
       let newWidth = startWidth;
       let newHeight = startHeight;
@@ -232,7 +234,7 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element, lay
         )}
         
         {/* Element Content */}
-        <div className="w-full h-full overflow-hidden bg-white dark:bg-gray-800 shadow-sm rounded-sm">
+        <div className="w-full h-full overflow-hidden bg-white !dark:bg-gray-300 shadow-sm rounded-sm">
           {element.type === 'header' && <HeaderElement element={element} />}
           {element.type === 'footer' && <FooterElement element={element} />}
           {element.type === 'card' && <CardElement element={element} />}

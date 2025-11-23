@@ -15,10 +15,13 @@ export const Canvas: React.FC = () => {
     addElement, 
     updateElement, 
     selectElement, 
-    canvasConfig 
+    canvasConfig,
+    zoom,
+    setZoom
   } = useBuilder();
   
-  const ref = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   const [dragState, setDragState] = React.useState<{
     x: number;
@@ -35,15 +38,25 @@ export const Canvas: React.FC = () => {
     }),
     hover: (item: any, monitor) => {
       const sourceClientOffset = monitor.getSourceClientOffset();
-      if (!sourceClientOffset || !ref.current) return;
+      if (!sourceClientOffset || !canvasRef.current) return;
 
-      const canvasRect = ref.current.getBoundingClientRect();
-      let x = sourceClientOffset.x - canvasRect.left;
-      let y = sourceClientOffset.y - canvasRect.top;
-
-      const snapped = getSnappedPosition(x, y, canvasConfig.grid.size, canvasConfig.grid.snap);
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const scale = zoom / 100;
       
-      // Resolve size for collision check
+      // Calculate unscaled dimensions
+      const unscaledWidth = canvasRect.width / scale;
+      const unscaledHeight = canvasRect.height / scale;
+
+      let x = (sourceClientOffset.x - canvasRect.left) / scale;
+      let y = (sourceClientOffset.y - canvasRect.top) / scale;
+
+      let snapped = getSnappedPosition(x, y, canvasConfig.grid.size, canvasConfig.grid.snap);
+      
+      // Clamp to positive coordinates
+      snapped.x = Math.max(0, snapped.x);
+      snapped.y = Math.max(0, snapped.y);
+      
+      // Resolve size for collision check using unscaled dimensions
       const resolveDimension = (val: number | string | undefined, containerSize: number) => {
         if (typeof val === 'number') return val;
         if (typeof val === 'string' && val.endsWith('%')) {
@@ -56,15 +69,15 @@ export const Canvas: React.FC = () => {
       const widthVal = item.size?.width;
       const heightVal = item.size?.height;
 
-      const width = resolveDimension(widthVal, canvasRect.width);
-      const height = resolveDimension(heightVal, canvasRect.height);
+      const width = resolveDimension(widthVal, unscaledWidth);
+      const height = resolveDimension(heightVal, unscaledHeight);
 
-      // Check collision
+      // Check collision using unscaled dimensions
       const isColliding = checkCollision(
         { x: snapped.x, y: snapped.y, width, height },
         elements,
         item.id, // Exclude self if moving
-        { width: canvasRect.width, height: canvasRect.height }
+        { width: unscaledWidth, height: unscaledHeight }
       );
 
       setDragState({
@@ -77,15 +90,25 @@ export const Canvas: React.FC = () => {
     },
     drop: (item: any, monitor) => {
       const sourceClientOffset = monitor.getSourceClientOffset();
-      if (!sourceClientOffset || !ref.current) return;
+      if (!sourceClientOffset || !canvasRef.current) return;
 
-      const canvasRect = ref.current.getBoundingClientRect();
-      let x = sourceClientOffset.x - canvasRect.left;
-      let y = sourceClientOffset.y - canvasRect.top;
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const scale = zoom / 100;
+      
+      // Calculate unscaled dimensions
+      const unscaledWidth = canvasRect.width / scale;
+      const unscaledHeight = canvasRect.height / scale;
 
-      const snapped = getSnappedPosition(x, y, canvasConfig.grid.size, canvasConfig.grid.snap);
+      let x = (sourceClientOffset.x - canvasRect.left) / scale;
+      let y = (sourceClientOffset.y - canvasRect.top) / scale;
 
-      // Final collision check
+      let snapped = getSnappedPosition(x, y, canvasConfig.grid.size, canvasConfig.grid.snap);
+
+      // Clamp to positive coordinates
+      snapped.x = Math.max(0, snapped.x);
+      snapped.y = Math.max(0, snapped.y);
+
+      // Final collision check using unscaled dimensions
       const resolveDimension = (val: number | string | undefined, containerSize: number) => {
         if (typeof val === 'number') return val;
         if (typeof val === 'string' && val.endsWith('%')) {
@@ -97,20 +120,20 @@ export const Canvas: React.FC = () => {
       const widthVal = item.size?.width;
       const heightVal = item.size?.height;
 
-      const width = resolveDimension(widthVal, canvasRect.width);
-      const height = resolveDimension(heightVal, canvasRect.height);
+      const width = resolveDimension(widthVal, unscaledWidth);
+      const height = resolveDimension(heightVal, unscaledHeight);
       
       const isColliding = checkCollision(
         { x: snapped.x, y: snapped.y, width, height },
         elements,
         item.id,
-        { width: canvasRect.width, height: canvasRect.height }
+        { width: unscaledWidth, height: unscaledHeight }
       );
 
-      if (isColliding) {
-        // Prevent drop
-        return;
-      }
+      // if (isColliding) {
+      //   // Prevent drop
+      //   return;
+      // }
 
       if (item.isNew) {
         addElement(item.type, snapped);
@@ -120,9 +143,9 @@ export const Canvas: React.FC = () => {
       
       setDragState(null);
     },
-  }, [elements, canvasConfig]);
+  }, [elements, canvasConfig, zoom]);
 
-  drop(ref);
+  drop(containerRef);
 
   // Clear drag state when not over
   React.useEffect(() => {
@@ -227,51 +250,87 @@ export const Canvas: React.FC = () => {
   }, [elements, canvasConfig.viewMode]);
 
   return (
-    <div 
-      ref={ref}
-      className="flex-1 relative bg-gray-50 dark:bg-gray-200 overflow-hidden transition-colors"
-      onClick={() => selectElement(null)}
-    >
-      {canvasConfig.grid.enabled && (
-        <GridOverlay size={canvasConfig.grid.size} />
-      )}
-      
-      <div 
-        className="w-full h-full relative"
-        style={{
-          // Simulate view mode width
-          width: canvasConfig.viewMode === 'mobile' ? '375px' : canvasConfig.viewMode === 'tablet' ? '768px' : '100%',
-          margin: '0 auto',
-          borderLeft: canvasConfig.viewMode !== 'desktop' ? '1px solid #e5e7eb' : 'none',
-          borderRight: canvasConfig.viewMode !== 'desktop' ? '1px solid #e5e7eb' : 'none',
-          transition: 'width 0.3s ease'
-        }}
-      >
-        {sortedElements.map((el) => (
-          <DraggableElement 
-            key={el.id} 
-            element={el} 
-            layoutOverride={el.layoutOverride}
-          />
-        ))}
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-50 dark:bg-gray-950 transition-colors">
+      {/* Toolbar */}
+      <div className="h-12 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center justify-end px-4 gap-2 z-10">
+        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          <button 
+            className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+            onClick={() => setZoom(Math.max(50, zoom - 10))}
+          >
+            −
+          </button>
+          <span className="text-sm font-medium w-12 text-center text-gray-700 dark:text-gray-200">{zoom}%</span>
+          <button 
+            className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+            onClick={() => setZoom(Math.min(200, zoom + 10))}
+          >
+            +
+          </button>
+          <button 
+            className="px-3 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 border-l border-gray-300 dark:border-gray-700 ml-1"
+            onClick={() => setZoom(100)}
+          >
+            Fit
+          </button>
+        </div>
+      </div>
 
-        {/* Ghost Element for Drag Feedback */}
-        {isOver && dragState && (
-          <div
+      {/* Canvas Area */}
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-auto preview-container relative dark:bg-gray-800 "
+        onClick={() => selectElement(null)}
+      >
+        <div 
+          className="min-h-full w-full flex justify-center p-8 origin-top"
+          style={{
+            transform: `scale(${zoom / 100})`,
+            transformOrigin: 'top center',
+          }}
+        >
+          <div 
+            ref={canvasRef}
+            className="relative bg-white dark:bg-gray-800 shadow-sm transition-all duration-300"
             style={{
-              position: 'absolute',
-              left: dragState.x,
-              top: dragState.y,
-              width: dragState.width,
-              height: dragState.height,
-              border: `2px solid ${dragState.isColliding ? 'red' : '#3b82f6'}`,
-              backgroundColor: dragState.isColliding ? 'rgba(255, 0, 0, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-              zIndex: 100,
-              pointerEvents: 'none',
-              transition: 'all 0.1s ease'
+              // Simulate view mode width
+              width: canvasConfig.viewMode === 'mobile' ? '375px' : canvasConfig.viewMode === 'tablet' ? '768px' : '100%',
+              minHeight: canvasConfig.viewMode === 'desktop' ? '100%' : '800px',
+              height: 'auto',
+              boxShadow: '0 0 20px rgba(0,0,0,0.05)'
             }}
-          />
-        )}
+          >
+            {canvasConfig.grid.enabled && (
+              <GridOverlay size={canvasConfig.grid.size} />
+            )}
+            
+            {sortedElements.map((el) => (
+              <DraggableElement 
+                key={el.id} 
+                element={el} 
+                layoutOverride={el.layoutOverride}
+              />
+            ))}
+
+            {/* Ghost Element for Drag Feedback */}
+            {isOver && dragState && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: dragState.x,
+                  top: dragState.y,
+                  width: dragState.width,
+                  height: dragState.height,
+                  border: `2px solid ${dragState.isColliding ? 'red' : '#3b82f6'}`,
+                  backgroundColor: dragState.isColliding ? 'rgba(255, 0, 0, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                  zIndex: 100,
+                  pointerEvents: 'none',
+                  transition: 'all 0.1s ease'
+                }}
+              />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
