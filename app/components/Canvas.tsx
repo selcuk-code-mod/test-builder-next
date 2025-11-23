@@ -5,6 +5,7 @@ import { useDrop } from 'react-dnd';
 import { useBuilder } from '../context/BuilderContext';
 import { DraggableElement } from './DraggableElement';
 import { GridOverlay } from './GridOverlay';
+import { BASE_WIDTH } from '../utils/elementDefaults';
 import { getSnappedPosition } from '../utils/positioning';
 import { checkCollision } from '../utils/collision';
 import { useToast } from './Toast';
@@ -78,6 +79,9 @@ export const Canvas: React.FC = () => {
 
       let snapped = getSnappedPosition(x, y, canvasConfig.grid.size, canvasConfig.grid.snap);
       
+      // Calculate scale factor for 1440px base
+      const scaleX = BASE_WIDTH / unscaledWidth;
+
       // Resolve dimensions first for boundary checking
       const resolveDim = (val: number | string | undefined, containerSize: number) => {
         if (typeof val === 'number') return val;
@@ -87,42 +91,44 @@ export const Canvas: React.FC = () => {
         return typeof val === 'number' ? val : 100;
       };
 
-      const tempWidth = resolveDim(item.size?.width, unscaledWidth);
-      const tempHeight = resolveDim(item.size?.height, unscaledHeight);
+      let tempWidth, tempHeight;
+
+      if (item.isNew) {
+        // item.size is in 1440-space (Store Space)
+        // We need screen dimensions for ghost and boundary check
+        const rawWidth = resolveDim(item.size?.width, BASE_WIDTH);
+        const rawHeight = resolveDim(item.size?.height, unscaledHeight); // Height is usually px
+
+        tempWidth = rawWidth / scaleX;
+        tempHeight = rawHeight;
+      } else {
+        // item.size is in Screen Space (from offsetWidth)
+        tempWidth = resolveDim(item.size?.width, unscaledWidth);
+        tempHeight = resolveDim(item.size?.height, unscaledHeight);
+      }
       
       // Clamp to canvas boundaries (prevent overflow from left, top, and right)
       snapped.x = Math.max(0, Math.min(snapped.x, unscaledWidth - tempWidth));
       snapped.y = Math.max(0, snapped.y); // Only top, bottom is unlimited
       
-      // Resolve size for collision check using unscaled dimensions
-      const resolveDimension = (val: number | string | undefined, containerSize: number) => {
-        if (typeof val === 'number') return val;
-        if (typeof val === 'string' && val.endsWith('%')) {
-          return (parseFloat(val) / 100) * containerSize;
-        }
-        // Default fallback if unknown or calc
-        return typeof val === 'number' ? val : 100; 
-      };
+      // Calculate Store Coordinates for collision and storage
+      const storeX = snapped.x * scaleX;
+      const storeWidth = tempWidth * scaleX;
 
-      const widthVal = item.size?.width;
-      const heightVal = item.size?.height;
-
-      const width = resolveDimension(widthVal, unscaledWidth);
-      const height = resolveDimension(heightVal, unscaledHeight);
-
-      // Check collision using unscaled dimensions
+      // Check collision using Store Space
+      // We pass BASE_WIDTH as container width so percentages are resolved relative to 1440
       const isColliding = checkCollision(
-        { x: snapped.x, y: snapped.y, width, height },
+        { x: storeX, y: snapped.y, width: storeWidth, height: tempHeight },
         elements,
         item.id, // Exclude self if moving
-        { width: unscaledWidth, height: unscaledHeight }
+        { width: BASE_WIDTH, height: unscaledHeight }
       );
 
       setDragState({
-        x: snapped.x,
+        x: snapped.x, // Screen space for ghost
         y: snapped.y,
-        width,
-        height,
+        width: tempWidth,
+        height: tempHeight,
         isColliding
       });
     },
@@ -142,6 +148,9 @@ export const Canvas: React.FC = () => {
 
       let snapped = getSnappedPosition(x, y, canvasConfig.grid.size, canvasConfig.grid.snap);
 
+      // Calculate scale factor for 1440px base
+      const scaleX = BASE_WIDTH / unscaledWidth;
+
       // Resolve dimensions first for boundary checking
       const resolveDim = (val: number | string | undefined, containerSize: number) => {
         if (typeof val === 'number') return val;
@@ -151,8 +160,17 @@ export const Canvas: React.FC = () => {
         return typeof val === 'number' ? val : 100;
       };
 
-      const tempWidth = resolveDim(item.size?.width, unscaledWidth);
-      const tempHeight = resolveDim(item.size?.height, unscaledHeight);
+      let tempWidth, tempHeight;
+
+      if (item.isNew) {
+        const rawWidth = resolveDim(item.size?.width, BASE_WIDTH);
+        const rawHeight = resolveDim(item.size?.height, unscaledHeight);
+        tempWidth = rawWidth / scaleX;
+        tempHeight = rawHeight;
+      } else {
+        tempWidth = resolveDim(item.size?.width, unscaledWidth);
+        tempHeight = resolveDim(item.size?.height, unscaledHeight);
+      }
       
       // Clamp to canvas boundaries (prevent overflow from left, top, and right)
       snapped.x = Math.max(0, Math.min(snapped.x, unscaledWidth - tempWidth));
@@ -164,30 +182,20 @@ export const Canvas: React.FC = () => {
         snapped.x = 0; // Also snap to left
       }
 
-      // Final collision check using unscaled dimensions
-      const resolveDimension = (val: number | string | undefined, containerSize: number) => {
-        if (typeof val === 'number') return val;
-        if (typeof val === 'string' && val.endsWith('%')) {
-          return (parseFloat(val) / 100) * containerSize;
-        }
-        return typeof val === 'number' ? val : 100;
-      };
+      // Calculate Store Coordinates
+      const storeX = snapped.x * scaleX;
+      const storeWidth = tempWidth * scaleX;
 
-      const widthVal = item.size?.width;
-      const heightVal = item.size?.height;
-
-      const width = resolveDimension(widthVal, unscaledWidth);
-      const height = resolveDimension(heightVal, unscaledHeight);
-      
+      // Final collision check using Store Space
       const isColliding = checkCollision(
-        { x: snapped.x, y: snapped.y, width, height },
+        { x: storeX, y: snapped.y, width: storeWidth, height: tempHeight },
         elements,
         item.id,
-        { width: unscaledWidth, height: unscaledHeight }
+        { width: BASE_WIDTH, height: unscaledHeight }
       );
 
       // Boundary validation
-      const elementBottomY = snapped.y + height;
+      const elementBottomY = snapped.y + tempHeight;
       
       if (elementBottomY > canvasConfig.maxHeight) {
         showToast('error', `Canvas yükseklik limiti aşıldı! (Max: ${canvasConfig.maxHeight}px)`);
@@ -205,9 +213,9 @@ export const Canvas: React.FC = () => {
       // }
 
       if (item.isNew) {
-        addElement(item.type, snapped);
+        addElement(item.type, { ...snapped, x: storeX });
       } else {
-        updateElement(item.id, { position: snapped });
+        updateElement(item.id, { position: { ...snapped, x: storeX } });
       }
       
       setDragState(null);

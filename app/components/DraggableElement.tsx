@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useDrag } from 'react-dnd';
 import { getEmptyImage } from 'react-dnd-html5-backend';
-import { BuilderElement } from '../utils/elementDefaults';
+import { BuilderElement, BASE_WIDTH } from '../utils/elementDefaults';
 import { useBuilder } from '../context/BuilderContext';
 import { HeaderElement } from './elements/HeaderElement';
 import { FooterElement } from './elements/FooterElement';
@@ -191,7 +191,7 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element, lay
       };
     }
 
-    const BASE_WIDTH = 1440;
+    // const BASE_WIDTH = 1440; // Now imported
     
     const left = typeof element.position.x === 'number' 
       ? `${(element.position.x / BASE_WIDTH) * 100}%` 

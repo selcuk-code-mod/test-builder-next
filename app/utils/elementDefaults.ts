@@ -1,3 +1,5 @@
+export const BASE_WIDTH = 1440;
+
 export type ElementType = 'header' | 'footer' | 'card' | 'text' | 'slider';
 
 export interface BuilderElement {
