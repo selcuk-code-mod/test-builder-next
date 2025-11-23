@@ -7,7 +7,7 @@ import { DraggableElement } from './DraggableElement';
 import { GridOverlay } from './GridOverlay';
 import { getSnappedPosition } from '../utils/positioning';
 import { checkCollision } from '../utils/collision';
-import { ELEMENT_DEFAULTS } from '../utils/elementDefaults';
+import { useToast } from './Toast';
 
 export const Canvas: React.FC = () => {
   const { 
@@ -20,8 +20,34 @@ export const Canvas: React.FC = () => {
     setZoom
   } = useBuilder();
   
+  const { showToast } = useToast();
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [windowWidth, setWindowWidth] = React.useState(typeof window !== 'undefined' ? window.innerWidth : 1440);
+
+  React.useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Calculate dynamic canvas height based on elements
+  const canvasHeight = React.useMemo(() => {
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 1000;
+    
+    if (elements.length === 0) return Math.max(viewportHeight, 1000);
+    
+    const maxY = elements.reduce((max, el) => {
+      const y = typeof el.position.y === 'number' ? el.position.y : 0;
+      const h = typeof el.size.height === 'number' ? el.size.height : 200;
+      return Math.max(max, y + h);
+    }, 0);
+    
+    // Add padding and ensure minimum height
+    const calculatedHeight = Math.max(maxY + 200, viewportHeight, 1000);
+    return Math.min(calculatedHeight, canvasConfig.maxHeight);
+  }, [elements, canvasConfig.maxHeight]);
 
   const [dragState, setDragState] = React.useState<{
     x: number;
@@ -52,9 +78,21 @@ export const Canvas: React.FC = () => {
 
       let snapped = getSnappedPosition(x, y, canvasConfig.grid.size, canvasConfig.grid.snap);
       
-      // Clamp to positive coordinates
-      snapped.x = Math.max(0, snapped.x);
-      snapped.y = Math.max(0, snapped.y);
+      // Resolve dimensions first for boundary checking
+      const resolveDim = (val: number | string | undefined, containerSize: number) => {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string' && val.endsWith('%')) {
+          return (parseFloat(val) / 100) * containerSize;
+        }
+        return typeof val === 'number' ? val : 100;
+      };
+
+      const tempWidth = resolveDim(item.size?.width, unscaledWidth);
+      const tempHeight = resolveDim(item.size?.height, unscaledHeight);
+      
+      // Clamp to canvas boundaries (prevent overflow from left, top, and right)
+      snapped.x = Math.max(0, Math.min(snapped.x, unscaledWidth - tempWidth));
+      snapped.y = Math.max(0, snapped.y); // Only top, bottom is unlimited
       
       // Resolve size for collision check using unscaled dimensions
       const resolveDimension = (val: number | string | undefined, containerSize: number) => {
@@ -104,9 +142,27 @@ export const Canvas: React.FC = () => {
 
       let snapped = getSnappedPosition(x, y, canvasConfig.grid.size, canvasConfig.grid.snap);
 
-      // Clamp to positive coordinates
-      snapped.x = Math.max(0, snapped.x);
-      snapped.y = Math.max(0, snapped.y);
+      // Resolve dimensions first for boundary checking
+      const resolveDim = (val: number | string | undefined, containerSize: number) => {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string' && val.endsWith('%')) {
+          return (parseFloat(val) / 100) * containerSize;
+        }
+        return typeof val === 'number' ? val : 100;
+      };
+
+      const tempWidth = resolveDim(item.size?.width, unscaledWidth);
+      const tempHeight = resolveDim(item.size?.height, unscaledHeight);
+      
+      // Clamp to canvas boundaries (prevent overflow from left, top, and right)
+      snapped.x = Math.max(0, Math.min(snapped.x, unscaledWidth - tempWidth));
+      snapped.y = Math.max(0, snapped.y); // Only top, bottom is unlimited
+
+      // Special handling for Header: Always snap to top
+      if (item.type === 'header') {
+        snapped.y = 0;
+        snapped.x = 0; // Also snap to left
+      }
 
       // Final collision check using unscaled dimensions
       const resolveDimension = (val: number | string | undefined, containerSize: number) => {
@@ -129,6 +185,19 @@ export const Canvas: React.FC = () => {
         item.id,
         { width: unscaledWidth, height: unscaledHeight }
       );
+
+      // Boundary validation
+      const elementBottomY = snapped.y + height;
+      
+      if (elementBottomY > canvasConfig.maxHeight) {
+        showToast('error', `Canvas yükseklik limiti aşıldı! (Max: ${canvasConfig.maxHeight}px)`);
+        setDragState(null);
+        return;
+      }
+
+      if (elementBottomY > canvasConfig.warningThreshold && elementBottomY <= canvasConfig.maxHeight) {
+        showToast('warning', `Canvas yükseklik limitine yaklaşıyorsunuz! (${Math.round(elementBottomY)}/${canvasConfig.maxHeight}px)`);
+      }
 
       // if (isColliding) {
       //   // Prevent drop
@@ -154,100 +223,38 @@ export const Canvas: React.FC = () => {
     }
   }, [isOver]);
 
-  // Auto-layout calculation for responsive modes
+  // Responsive layout override
   const sortedElements = React.useMemo(() => {
-    if (canvasConfig.viewMode === 'desktop') {
-      return elements.map(el => ({ ...el, layoutOverride: undefined }));
+    // Mobile stacking logic (< 600px)
+    if (windowWidth <= 600) {
+      // Sort by Y position to stack correctly
+      const sorted = [...elements].sort((a, b) => {
+        const aY = typeof a.position.y === 'number' ? a.position.y : 0;
+        const bY = typeof b.position.y === 'number' ? b.position.y : 0;
+        return aY - bY;
+      });
+
+      let currentY = 0;
+      const GAP = 20;
+
+      return sorted.map(el => {
+        const height = typeof el.size.height === 'number' ? el.size.height : 200;
+        
+        const override = {
+          x: 0,
+          y: currentY,
+          width: '100%',
+          height
+        };
+        
+        currentY += height + GAP;
+        
+        return { ...el, layoutOverride: override };
+      });
     }
 
-    // Sort elements by Y position (then X) to determine flow order
-    const sorted = [...elements].sort((a, b) => {
-      const aY = typeof a.position.y === 'number' ? a.position.y : 0;
-      const bY = typeof b.position.y === 'number' ? b.position.y : 0;
-      if (Math.abs(aY - bY) > 10) return aY - bY; // Tolerance for same row
-      
-      const aX = typeof a.position.x === 'number' ? a.position.x : 0;
-      const bX = typeof b.position.x === 'number' ? b.position.x : 0;
-      return aX - bX;
-    });
-
-    let currentY = 0;
-    let currentRowHeight = 0;
-    let col = 0;
-    const GAP = 20;
-
-    return sorted.map(el => {
-      const viewMode = canvasConfig.viewMode as 'mobile' | 'tablet';
-      // Resolve width: check instance override -> type default -> fallback
-      const instanceResp = el.responsive?.[viewMode];
-      const defaultResp = ELEMENT_DEFAULTS[el.type].responsive?.[viewMode];
-      
-      // Check if element has specific responsive positioning (manual override)
-      if (instanceResp && instanceResp.y !== undefined) {
-        // Flush current row if any
-        if (col > 0) {
-          currentY += currentRowHeight + GAP;
-          currentRowHeight = 0;
-          col = 0;
-        }
-
-        // Update currentY to be below this element if it's further down
-        const h = instanceResp.height || el.size.height;
-        const y = instanceResp.y;
-        
-        if (typeof y === 'number' && typeof h === 'number') {
-           currentY = Math.max(currentY, y + h + GAP);
-        }
-        
-        return { ...el, layoutOverride: undefined };
-      }
-
-      // Otherwise, auto-stack
-      const width = instanceResp?.width ?? defaultResp?.width ?? '100%';
-      const height = typeof instanceResp?.height === 'number' ? instanceResp.height : 
-                     (typeof defaultResp?.height === 'number' ? defaultResp.height :
-                     (typeof el.size.height === 'number' ? el.size.height : 200));
-      
-      // Check if half width (e.g. tablet cards)
-      const isHalf = typeof width === 'string' && width.includes('/ 2');
-      
-      let x: string | number = 0;
-      let y = currentY;
-
-      if (isHalf) {
-        if (col === 0) {
-          x = 0;
-          currentRowHeight = Math.max(currentRowHeight, height as number);
-          col = 1;
-        } else {
-          x = '50%';
-          currentRowHeight = Math.max(currentRowHeight, height as number);
-          col = 0;
-          currentY += currentRowHeight + GAP;
-          currentRowHeight = 0;
-        }
-      } else {
-        // Full width
-        if (col > 0) {
-          currentY += currentRowHeight + GAP;
-          currentRowHeight = 0;
-          col = 0;
-          y = currentY;
-        }
-        x = 0;
-        currentY += (height as number) + GAP;
-      }
-
-      const override = {
-        x,
-        y,
-        width,
-        height
-      };
-
-      return { ...el, layoutOverride: override };
-    });
-  }, [elements, canvasConfig.viewMode]);
+    return elements.map(el => ({ ...el, layoutOverride: undefined }));
+  }, [elements, windowWidth]);
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-50 dark:bg-gray-950 transition-colors">
@@ -279,7 +286,7 @@ export const Canvas: React.FC = () => {
       {/* Canvas Area */}
       <div 
         ref={containerRef}
-        className="flex-1 overflow-auto preview-container relative dark:bg-gray-800 "
+        className="flex-1 overflow-auto preview-container relative dark:bg-gray-600"
         onClick={() => selectElement(null)}
       >
         <div 
@@ -291,17 +298,18 @@ export const Canvas: React.FC = () => {
         >
           <div 
             ref={canvasRef}
-            className="relative bg-white dark:bg-gray-800 shadow-sm transition-all duration-300"
+            className="relative bg-white dark:bg-gray-600 shadow-sm transition-all duration-300"
             style={{
-              // Simulate view mode width
-              width: canvasConfig.viewMode === 'mobile' ? '375px' : canvasConfig.viewMode === 'tablet' ? '768px' : '100%',
-              minHeight: canvasConfig.viewMode === 'desktop' ? '100%' : '800px',
+              width: '100%',
+              maxWidth: '1440px',
+              minHeight: '100vh',
+              maxHeight: `${canvasConfig.maxHeight}px`,
               height: 'auto',
               boxShadow: '0 0 20px rgba(0,0,0,0.05)'
             }}
           >
             {canvasConfig.grid.enabled && (
-              <GridOverlay size={canvasConfig.grid.size} />
+              <GridOverlay size={canvasConfig.grid.size} canvasHeight={canvasHeight} />
             )}
             
             {sortedElements.map((el) => (

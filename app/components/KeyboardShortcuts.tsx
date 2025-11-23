@@ -20,6 +20,7 @@ export const KeyboardShortcuts = () => {
       }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        console.log('Delete key pressed', selectedId);
         if (selectedId) {
           removeElement(selectedId);
         }

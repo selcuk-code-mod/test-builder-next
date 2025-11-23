@@ -47,7 +47,6 @@ export const Toolbar: React.FC = () => {
   return (
     <div className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 hidden min-[950px]:flex items-center px-6 justify-between shadow-sm z-10">
       <div className="flex items-center gap-3">
-
         {/* Grid Controls */}
         <button 
           onClick={() => updateCanvasConfig({ grid: { ...canvasConfig.grid, enabled: !canvasConfig.grid.enabled } })}

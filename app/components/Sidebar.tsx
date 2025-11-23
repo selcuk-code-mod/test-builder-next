@@ -24,7 +24,11 @@ const SidebarItem: React.FC<{ type: ElementType; label: string; isCollapsed: boo
     item: { 
       type, 
       isNew: true,
-      size: ELEMENT_DEFAULTS[type].size 
+      size: {
+        ...ELEMENT_DEFAULTS[type].size,
+        // If height is 'auto', provide a default pixel height for the drag preview ghost element
+        height: ELEMENT_DEFAULTS[type].size?.height === 'auto' ? 40 : ELEMENT_DEFAULTS[type].size?.height
+      }
     },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
@@ -100,7 +104,7 @@ export const Sidebar: React.FC = () => {
         {!isCollapsed && (
           <div>
             <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
-              Builder
+              Builder Page
             </h2>
             <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">v1.0</p>
           </div>

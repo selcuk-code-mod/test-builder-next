@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useDrag } from 'react-dnd';
 import { getEmptyImage } from 'react-dnd-html5-backend';
-import { BuilderElement, ELEMENT_DEFAULTS } from '../utils/elementDefaults';
+import { BuilderElement } from '../utils/elementDefaults';
 import { useBuilder } from '../context/BuilderContext';
 import { HeaderElement } from './elements/HeaderElement';
 import { FooterElement } from './elements/FooterElement';
@@ -47,12 +47,18 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element, lay
   // Drag logic
   const [{ isDragging }, drag, preview] = useDrag({
     type: 'CANVAS_ELEMENT',
-    item: { 
-      id: element.id, 
-      type: element.type, 
-      isNew: false,
-      size: element.size,
-      responsive: element.responsive 
+    item: () => {
+      // Get current dimensions from DOM to handle 'auto' height correctly during drag
+      const currentWidth = ref.current?.offsetWidth || element.size.width;
+      const currentHeight = ref.current?.offsetHeight || element.size.height;
+      
+      return { 
+        id: element.id, 
+        type: element.type, 
+        isNew: false,
+        size: { width: currentWidth, height: currentHeight },
+        responsive: element.responsive 
+      };
     },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
@@ -102,6 +108,29 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element, lay
         newY = startTop + deltaY;
       }
 
+      // Aspect Ratio Preservation (Shift Key)
+      if (moveEvent.shiftKey) {
+        const aspectRatio = startWidth / startHeight;
+        
+        // Determine dominant axis based on direction or delta
+        // For simplicity, let width drive height for E/W resizing, and height drive width for N/S
+        // For corners, use the larger delta
+        
+        if (direction.includes('e') || direction.includes('w')) {
+          newHeight = newWidth / aspectRatio;
+          // Adjust Y if resizing from North
+          if (direction.includes('n')) {
+             newY = startTop + (startHeight - newHeight);
+          }
+        } else if (direction.includes('n') || direction.includes('s')) {
+          newWidth = newHeight * aspectRatio;
+          // Adjust X if resizing from West
+          if (direction.includes('w')) {
+            newX = startLeft + (startWidth - newWidth);
+          }
+        }
+      }
+
       // Grid Snap for Resize
       if (canvasConfig.grid.snap) {
         if (direction.includes('e') || direction.includes('w')) newWidth = snapToGrid(newWidth, canvasConfig.grid.size);
@@ -147,49 +176,41 @@ export const DraggableElement: React.FC<DraggableElementProps> = ({ element, lay
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  // Responsive Styles
+  // Styles - canvas is fixed 1440px base, but fluid width
+  // We convert px positions to percentages relative to 1440px for responsiveness
   const getStyles = () => {
-    const { viewMode } = canvasConfig;
-    let width = element.size.width;
-    let height = element.size.height;
-    let x: number | string = element.position.x;
-    let y: number | string = element.position.y;
-
-    if (viewMode !== 'desktop') {
-      const resp = element.responsive?.[viewMode];
-      const defaultResp = ELEMENT_DEFAULTS[element.type].responsive?.[viewMode];
-      
-      // Width priority: responsive > default > layoutOverride > fallback (100%)
-      if (resp?.width !== undefined) width = resp.width;
-      else if (defaultResp?.width !== undefined) width = defaultResp.width;
-      else if (layoutOverride?.width !== undefined) width = layoutOverride.width;
-      else width = '100%';
-
-      // Height priority: responsive > default > layoutOverride > fallback (current size)
-      if (resp?.height !== undefined) height = resp.height;
-      else if (defaultResp?.height !== undefined) height = defaultResp.height;
-      else if (layoutOverride?.height !== undefined) height = layoutOverride.height;
-      
-      // X priority: responsive > default > layoutOverride > fallback (0)
-      if (resp?.x !== undefined) x = resp.x;
-      else if (defaultResp?.x !== undefined) x = defaultResp.x;
-      else if (layoutOverride?.x !== undefined) x = layoutOverride.x;
-      else x = 0;
-
-      // Y priority: responsive > default > layoutOverride > fallback (current pos)
-      if (resp?.y !== undefined) y = resp.y;
-      else if (defaultResp?.y !== undefined) y = defaultResp.y;
-      else if (layoutOverride?.y !== undefined) y = layoutOverride.y;
-      // If neither, we keep the desktop Y (which might be weird, but usually layoutOverride covers it)
+    // Check for layout override (used for mobile stacking < 600px)
+    if (layoutOverride) {
+      return {
+        left: layoutOverride.x,
+        top: layoutOverride.y,
+        width: layoutOverride.width,
+        height: layoutOverride.height || element.size.height,
+        zIndex: element.zIndex,
+        maxWidth: '100%',
+      };
     }
 
+    const BASE_WIDTH = 1440;
+    
+    const left = typeof element.position.x === 'number' 
+      ? `${(element.position.x / BASE_WIDTH) * 100}%` 
+      : element.position.x;
+      
+    const top = element.position.y; // Y is usually px and scrolls, so keep it px
+    
+    let width: string | number = element.size.width;
+    if (typeof width === 'number') {
+      width = `${(width / BASE_WIDTH) * 100}%`;
+    }
+    
     return {
-      left: x,
-      top: y,
+      left,
+      top,
       width,
-      height,
+      height: element.size.height,
       zIndex: element.zIndex,
-      maxWidth: '100%', // Ensure it never overflows container width
+      maxWidth: '100%',
     };
   };
 

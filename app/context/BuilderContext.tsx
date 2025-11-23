@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useCallback } from 'react';
 import { BuilderElement, ElementType, ELEMENT_DEFAULTS } from '../utils/elementDefaults';
 import { validateJSON } from '../utils/validation';
 
@@ -10,7 +10,8 @@ interface CanvasConfig {
     size: number;
     snap: boolean;
   };
-  viewMode: 'desktop' | 'tablet' | 'mobile';
+  maxHeight: number;
+  warningThreshold: number;
 }
 
 interface BuilderState {
@@ -52,7 +53,8 @@ const initialState: BuilderState = {
   selectedId: null,
   canvasConfig: {
     grid: { enabled: true, size: 20, snap: true },
-    viewMode: 'desktop',
+    maxHeight: 20000,
+    warningThreshold: 18000,
   },
   zoom: 100,
   history: {
@@ -272,31 +274,6 @@ export const BuilderProvider: React.FC<{ children: React.ReactNode }> = ({ child
       alert('Invalid JSON: ' + validation.errors.join(', '));
     }
   }, [updateCanvasConfig]);
-
-  // Auto-detect view mode based on window size
-  useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      let newMode: 'mobile' | 'tablet' | 'desktop' = 'desktop';
-      
-      if (width < 768) {
-        newMode = 'mobile';
-      } else if (width < 1024) {
-        newMode = 'tablet';
-      }
-
-      // Only update if changed to avoid loops/re-renders
-      if (state.canvasConfig.viewMode !== newMode) {
-        updateCanvasConfig({ viewMode: newMode });
-      }
-    };
-
-    // Initial check
-    handleResize();
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [state.canvasConfig.viewMode, updateCanvasConfig]);
 
   return (
     <BuilderContext.Provider
