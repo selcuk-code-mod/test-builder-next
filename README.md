@@ -103,7 +103,7 @@ test-builder-next/
 │   ├── components/         # UI Components
 │   │   ├── elements/       # Builder Elements (Card, Slider, etc.)
 │   │   ├── Canvas.tsx      # Main drawing area
-│   │   ├── Canvas.tsx      # Main drawing area
+│   │   ├── DraggableElement.tsx # Element wrapper with drag logic
 │   │   ├── ElementSettingsModal.tsx # Settings popup
 │   │   ├── Sidebar.tsx     # Left sidebar for tools
 │   │   └── Toolbar.tsx     # Top bar for actions
@@ -223,7 +223,7 @@ test-builder-next/
 │   ├── components/         # UI Bileşenleri
 │   │   ├── elements/       # Oluşturucu Elementleri (Kart, Kaydırıcı, vb.)
 │   │   ├── Canvas.tsx      # Ana çizim alanı
-│   │   ├── Canvas.tsx      # Ana çizim alanı
+│   │   ├── DraggableElement.tsx # Sürükleme mantığını içeren kapsayıcı
 │   │   ├── ElementSettingsModal.tsx # Ayarlar penceresi
 │   │   ├── Sidebar.tsx     # Araçlar için sol kenar çubuğu
 │   │   └── Toolbar.tsx     # İşlemler için üst çubuk
