@@ -9,8 +9,9 @@ Test Builder is a modern, powerful, and responsive drag-and-drop page builder bu
 ### 🎨 Visual Editor
 - **Drag & Drop Interface**: Intuitive canvas for placing and arranging elements.
 - **Grid System**: Optional grid overlay with snap-to-grid functionality for precise alignment.
-- **Multi-Viewport Support**: Switch between **Desktop**, **Tablet**, and **Mobile** views to ensure responsive designs.
-- **Zoom & Pan**: (Planned) Navigate large layouts with ease.
+- **Multi-Viewport Support**: Switch between **Desktop**, **Tablet**, and **Mobile** views.
+  - **Automatic Mobile Stacking**: Elements automatically stack vertically on mobile screens (<600px) for better readability.
+- **Zoom Controls**: Zoom in/out to navigate large layouts with ease.
 
 ### 🧩 Rich Element Library
 - **Header**: Customizable navigation bars with logo and links.
@@ -24,11 +25,11 @@ Test Builder is a modern, powerful, and responsive drag-and-drop page builder bu
   - Slide navigation and indicators
 
 ### 🛠️ Advanced Customization
-- **Property Panel**: Real-time editing of selected elements:
+- **Element Toolbar**: Floating toolbar for quick actions (Edit, Layering, Delete).
+- **Settings Modal**: Detailed editing window for selected elements:
   - **Layout**: Position (X, Y) and Size (Width, Height).
-  - **Layering**: Z-Index control (Bring to Front, Send to Back).
   - **Content**: Edit text, links, and images directly.
-  - **Responsive Settings**: Define specific behaviors for different devices.
+  - **Images**: Upload and manage slider/card images.
 
 ### 🌓 Theme System
 - **Dark/Light Mode**: Fully integrated theme system with:
@@ -42,12 +43,12 @@ Test Builder is a modern, powerful, and responsive drag-and-drop page builder bu
 - **JSON Import/Export**: 
   - Save your work locally as JSON.
   - Import existing layouts.
-  - **Smart Import**: Supports multiple JSON schemas (Simple, Project-based, Component-based) with automatic conversion.
+  - **Smart Import**: Supports multiple JSON schemas with automatic conversion.
 - **Keyboard Shortcuts**:
   - `Ctrl + Z`: Undo
-  - `Ctrl + Y`: Redo
+  - `Ctrl + Y` / `Ctrl + Shift + Z`: Redo
+  - `Ctrl + D`: Duplicate selected element
   - `Delete` / `Backspace`: Remove selected element
-  - `Ctrl + S`: Save (Export JSON)
 
 ## 🛠️ Tech Stack
 
@@ -88,7 +89,7 @@ Test Builder is a modern, powerful, and responsive drag-and-drop page builder bu
 ## 🎮 Usage Guide
 
 1.  **Adding Elements**: Drag an element (e.g., "Card") from the **Sidebar** on the left and drop it onto the **Canvas**.
-2.  **Editing**: Click on any element in the canvas to select it. The **Property Panel** on the right will show its editable properties.
+2.  **Editing**: Click on any element to select it. Use the floating **Toolbar** or click "Edit" to open the **Settings Modal**.
 3.  **Moving & Resizing**: Drag elements around the canvas. Use the property panel for precise sizing.
 4.  **Responsive Check**: Use the device icons in the **Toolbar** (top) to switch viewports and verify how your layout adapts.
 5.  **Dark Mode**: Click the Sun/Moon icon in the toolbar to toggle themes.
@@ -102,7 +103,8 @@ test-builder-next/
 │   ├── components/         # UI Components
 │   │   ├── elements/       # Builder Elements (Card, Slider, etc.)
 │   │   ├── Canvas.tsx      # Main drawing area
-│   │   ├── PropertyPanel.tsx # Right sidebar for editing
+│   │   ├── Canvas.tsx      # Main drawing area
+│   │   ├── ElementSettingsModal.tsx # Settings popup
 │   │   ├── Sidebar.tsx     # Left sidebar for tools
 │   │   └── Toolbar.tsx     # Top bar for actions
 │   ├── context/            # React Contexts (Builder, Theme)
@@ -114,15 +116,7 @@ test-builder-next/
 └── ...config files
 ```
 
-## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
----
 
 # 🇹🇷 Test Builder - Profesyonel Sürükle & Bırak Sayfa Oluşturucu
 
@@ -135,8 +129,9 @@ Test Builder, **Next.js 15**, **React 19** ve **Tailwind CSS v4** ile oluşturul
 ### 🎨 Görsel Editör
 - **Sürükle & Bırak Arayüzü**: Elementleri yerleştirmek ve düzenlemek için sezgisel tuval.
 - **Izgara Sistemi**: Hassas hizalama için ızgaraya yapışma özelliğine sahip isteğe bağlı ızgara katmanı.
-- **Çoklu Görünüm Desteği**: Responsive tasarımlar sağlamak için **Masaüstü**, **Tablet** ve **Mobil** görünümleri arasında geçiş yapın.
-- **Yakınlaştır & Kaydır**: (Planlanan) Büyük düzenlerde kolayca gezinin.
+- **Çoklu Görünüm Desteği**: **Masaüstü**, **Tablet** ve **Mobil** görünümleri arasında geçiş yapın.
+  - **Otomatik Mobil Sıralama**: Mobil ekranlarda (<600px) elementler daha iyi okunabilirlik için otomatik olarak dikey sıralanır.
+- **Yakınlaştırma Kontrolleri**: Büyük düzenlerde kolayca gezinmek için yakınlaştırıp uzaklaştırın.
 
 ### 🧩 Zengin Element Kütüphanesi
 - **Header (Başlık)**: Logo ve bağlantılar içeren özelleştirilebilir gezinme çubukları.
@@ -150,11 +145,11 @@ Test Builder, **Next.js 15**, **React 19** ve **Tailwind CSS v4** ile oluşturul
   - Slayt navigasyonu ve göstergeleri
 
 ### 🛠️ Gelişmiş Özelleştirme
-- **Özellik Paneli**: Seçilen elementlerin gerçek zamanlı düzenlenmesi:
+- **Element Araç Çubuğu**: Hızlı işlemler için yüzen araç çubuğu (Düzenle, Katmanlama, Sil).
+- **Ayarlar Modalı**: Seçilen elementler için detaylı düzenleme penceresi:
   - **Düzen**: Konum (X, Y) ve Boyut (Genişlik, Yükseklik).
-  - **Katmanlama**: Z-Index kontrolü (Öne Getir, Arkaya Gönder).
   - **İçerik**: Metni, bağlantıları ve görselleri doğrudan düzenleyin.
-  - **Responsive Ayarlar**: Farklı cihazlar için özel davranışlar tanımlayın.
+  - **Görseller**: Slider/Kart görsellerini yükleyin ve yönetin.
 
 ### 🌓 Tema Sistemi
 - **Karanlık/Aydınlık Modu**: Tam entegre tema sistemi:
@@ -168,12 +163,12 @@ Test Builder, **Next.js 15**, **React 19** ve **Tailwind CSS v4** ile oluşturul
 - **JSON İçe/Dışa Aktarma**: 
   - Çalışmanızı yerel olarak JSON formatında kaydedin.
   - Mevcut düzenleri içe aktarın.
-  - **Akıllı İçe Aktarma**: Otomatik dönüştürme ile birden fazla JSON şemasını (Basit, Proje tabanlı, Bileşen tabanlı) destekler.
+  - **Akıllı İçe Aktarma**: Otomatik dönüştürme ile birden fazla JSON şemasını destekler.
 - **Klavye Kısayolları**:
   - `Ctrl + Z`: Geri Al
-  - `Ctrl + Y`: Yinele
+  - `Ctrl + Y` / `Ctrl + Shift + Z`: Yinele
+  - `Ctrl + D`: Seçili elementi çoğalt
   - `Delete` / `Backspace`: Seçili elementi kaldır
-  - `Ctrl + S`: Kaydet (JSON Dışa Aktar)
 
 ## 🛠️ Teknoloji Yığını
 
@@ -214,7 +209,7 @@ Test Builder, **Next.js 15**, **React 19** ve **Tailwind CSS v4** ile oluşturul
 ## 🎮 Kullanım Kılavuzu
 
 1.  **Element Ekleme**: Sol taraftaki **Kenar Çubuğu**'ndan bir elementi (örneğin, "Kart") sürükleyin ve **Tuval** üzerine bırakın.
-2.  **Düzenleme**: Seçmek için tuvaldeki herhangi bir elemente tıklayın. Sağ taraftaki **Özellik Paneli** düzenlenebilir özelliklerini gösterecektir.
+2.  **Düzenleme**: Seçmek için herhangi bir elemente tıklayın. Yüzen **Araç Çubuğu**nu kullanın veya **Ayarlar Modalı**nı açmak için "Düzenle"ye tıklayın.
 3.  **Taşıma & Yeniden Boyutlandırma**: Elementleri tuval üzerinde sürükleyin. Hassas boyutlandırma için özellik panelini kullanın.
 4.  **Responsive Kontrolü**: Düzeninizin nasıl uyarlandığını doğrulamak ve görünümler arasında geçiş yapmak için **Araç Çubuğu**'ndaki (üstte) cihaz ikonlarını kullanın.
 5.  **Karanlık Mod**: Temaları değiştirmek için araç çubuğundaki Güneş/Ay ikonuna tıklayın.
@@ -228,7 +223,8 @@ test-builder-next/
 │   ├── components/         # UI Bileşenleri
 │   │   ├── elements/       # Oluşturucu Elementleri (Kart, Kaydırıcı, vb.)
 │   │   ├── Canvas.tsx      # Ana çizim alanı
-│   │   ├── PropertyPanel.tsx # Düzenleme için sağ kenar çubuğu
+│   │   ├── Canvas.tsx      # Ana çizim alanı
+│   │   ├── ElementSettingsModal.tsx # Ayarlar penceresi
 │   │   ├── Sidebar.tsx     # Araçlar için sol kenar çubuğu
 │   │   └── Toolbar.tsx     # İşlemler için üst çubuk
 │   ├── context/            # React Context'leri (Builder, Theme)
@@ -240,10 +236,4 @@ test-builder-next/
 └── ...yapılandırma dosyaları
 ```
 
-## 🤝 Katkıda Bulunma
 
-Katkılarınızı bekliyoruz! Lütfen bir Pull Request göndermekten çekinmeyin.
-
-## 📄 Lisans
-
-Bu proje MIT Lisansı altında lisanslanmıştır.
